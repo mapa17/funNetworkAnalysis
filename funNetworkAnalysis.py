@@ -350,42 +350,50 @@ def export_cfos_data(cfos, outDir, csv_file='cfosExpression.csv', clustering_fig
     column_order = ['noInjection', 'DZP', 'DZP_shock', 'DZP_EPM', 'saline', 'DZP_shock_EPM', 'saline_shock', 'saline_EPM', 'saline_shock_EPM']
     plotting.plot_ordered_heatmap_from_clustering(g, column_order, outfig=outDir + 'sorted_' + clustering_figure, dpi=dpi)
 
-def neighbourhood_correlation_analysis(G, testCM, treatCM, pos, directional=False, weight=True, average=True, outDir='.', dpi=100):
+
+def neighbourhood_correlation_analysis(G, testCM, treatCM, pos, directional=False, weight=True, average=True, sum_absolute=True, outDir='.', dpi=100):
     """
     Perform a neighbourhood correlation analysis on the graph G
     """
-    if directional:
-        treatG = tools.updateEdges(G.to_directed(), treatCM, 'correlation')
-        testG = tools.updateEdges(G.to_directed(), testCM, 'correlation')
-        drugG = tools.updateEdges(G.to_directed(), treatCM - testCM, 'correlation')
-        #Perform a node correlation analysis for each node (summing up the correlation change for all its edges)
-        cS, _ = nodeAnalysis(testG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'Test Neighborhood Correlation', 'outPath':outDir + 'TestCorrelationSum.png', 'dpi':dpi})
-        cS, _ = nodeAnalysis(treatG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average},resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'Treatment Neighborhood Correlation', 'outPath':outDir + 'TreatmentCorrelationSum.png', 'dpi':dpi})
-        cS, _ = nodeAnalysis(drugG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'[Treat - Test] Neighborhood Correlation', 'outPath':outDir + 'DrugCorrelationSum.png', 'dpi':dpi})
+    # Add to the edge of the graph the correlation data
+    G = tools.updateEdges(G.to_directed(), treatCM, 'treat_correlation')
+    G = tools.updateEdges(G, testCM, 'test_correlation')
+    G = tools.updateEdges(G, treatCM - testCM, 'effect_correlation')
 
-        logging.info('Performing a network correlation analysis for inbound and outgoing edges ...')
-        sumCorrelation = tools.updateNodes(treatG, dict(zip(cS.keys(), [x[0] for x in cS.values()])), 'correlationSumInput')
-        sumCorrelation = tools.updateNodes(sumCorrelation, dict(zip(cS.keys(), [x[1] for x in cS.values()])), 'correlationSumOutput')
+    # Perform a node correlation analysis for each node (for each node sum up the correleation values for each edge; for ingoing and outgoing edges separatly)
+    cS, _ = nodeAnalysis(G, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'treat_correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'Test Neighborhood Correlation', 'outPath':outDir + 'TestCorrelationSum.png', 'dpi':dpi})
+    cS, _ = nodeAnalysis(G, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'test_correlation', 'average':average},resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'Treatment Neighborhood Correlation', 'outPath':outDir + 'TreatmentCorrelationSum.png', 'dpi':dpi})
+    cS, _ = nodeAnalysis(G, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'effect_correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Input Correlation', 'Avg. Sum Out Correlation'], 'title':'[Treat - Test] Neighborhood Correlation', 'outPath':outDir + 'DrugCorrelationSum.png', 'dpi':dpi})
 
-        #Make sure the node color scale is the same for both plots
-        scI = [nAttr['correlationSumInput'] for nName, nAttr in sumCorrelation.nodes(data=True)]
-        scO = [nAttr['correlationSumOutput'] for nName, nAttr in sumCorrelation.nodes(data=True)]
-        nmin = np.round(min(min(scI), min(scO)), decimals=2)
-        nmax = np.round(max(max(scI), max(scO)), decimals=2)
-        pos = plotting.plotGraph(sumCorrelation, title='Correlation Sum Analysis (Input Edges)', outputDir=outDir, edge_color=None, edge_cmap=plt.cm.Blues, arrows=False, node_cmap=plt.cm.RdYlGn, pos=pos, node_attr='correlationSumInput', node_colorbar_title='Phi', nv_limits=(nmin, nmax), dpi=dpi)
-        pos = plotting.plotGraph(sumCorrelation, title='Correlation Sum Analysis (Output Edges)', outputDir=outDir, edge_color=None, edge_cmap=plt.cm.Blues, arrows=False, node_cmap=plt.cm.RdYlGn, pos=pos, node_attr='correlationSumOutput', node_colorbar_title='Phi', nv_limits=(nmin, nmax), dpi=dpi)
-    else:
-        treatG = tools.updateEdges(G.to_undirected(), treatCM, 'correlation')
-        testG = tools.updateEdges(G.to_undirected(), testCM, 'correlation')
-        drugG = tools.updateEdges(G.to_undirected(), treatCM - testCM, 'correlation')
-        #Perform a node correlation analysis for each node (summing up the correlation change for all its edges)
-        cS, _ = nodeAnalysis(testG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Correlation'], 'title':'Test Neighborhood Correlation', 'outPath':outDir + 'TestCorrelationSum.png', 'dpi':dpi})
-        cS, _ = nodeAnalysis(treatG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average},resultArguments={'ylabel':['Avg. Sum Correlation'], 'title':'Treatment Neighborhood Correlation', 'outPath':outDir + 'TreatmentCorrelationSum.png', 'dpi':dpi})
-        cS, _ = nodeAnalysis(drugG, anlayseCorrelationNeighborhood, plotting.plotNodeBars, nodeArguments={'weight':weight, 'attrName':'correlation', 'average':average}, resultArguments={'ylabel':['Avg. Sum Correlation'], 'title':'[Treat - Test] Neighborhood Correlation', 'outPath':outDir + 'DrugCorrelationSum.png', 'dpi':dpi})
+    logging.info('Performing a network correlation analysis for inbound and outgoing edges ...')
+    G = tools.updateNodes(G, dict(zip(cS.keys(), [x[0] for x in cS.values()])), 'effect_correlation_sum_input')
+    G = tools.updateNodes(G, dict(zip(cS.keys(), [x[1] for x in cS.values()])), 'effect_correlation_sum_output')
 
-        logging.info('Performing a network correlation analysis ...')
-        sumCorrelation = tools.updateNodes(treatG, dict(zip(cS.keys(), [x for x in cS.values()])), 'correlationSum')
-        pos = plotting.plotGraph(sumCorrelation, title='Correlation Sum Analysis', outputDir=outDir, edge_color='lightgray', edge_cmap=plt.cm.Blues, arrows=False, node_cmap=plt.cm.RdYlGn, pos=pos, node_attr='correlationSum', node_colorbar_title='Phi', dpi=dpi)
+    # Plot the graph, color coding the nodes depending on the effective correlation sum
+    # Make sure the node color scale is the same for both plots
+    scI = [nAttr['effect_correlation_sum_input'] for nName, nAttr in G.nodes(data=True)]
+    scO = [nAttr['effect_correlation_sum_output'] for nName, nAttr in G.nodes(data=True)]
+    nmin = np.round(min(min(scI), min(scO)), decimals=2)
+    nmax = np.round(max(max(scI), max(scO)), decimals=2)
+    pos = plotting.plotGraph(G, title='Neighborhood Correlation Sum Analysis (Input Edges)', outputDir=outDir, edge_color=None, edge_cmap=plt.cm.Blues, arrows=False, node_cmap=plt.cm.RdYlGn, pos=pos, node_attr='effect_correlation_sum_input', node_colorbar_title='Phi', nv_limits=(nmin, nmax), dpi=dpi)
+    pos = plotting.plotGraph(G, title='Neighborhood Correlation Sum Analysis (Output Edges)', outputDir=outDir, edge_color=None, edge_cmap=plt.cm.Blues, arrows=False, node_cmap=plt.cm.RdYlGn, pos=pos, node_attr='effect_correlation_sum_output', node_colorbar_title='Phi', nv_limits=(nmin, nmax), dpi=dpi)
+
+    # Optional calculate the sum of the correlation of ingoing and outgoing edges
+    table = tools.get_nodes_as_table(G)
+    if not directional:
+        if sum_absolute:
+            logging.info('Using absolute values to sum up correlation values!')
+            table['total_effect_correlation_sum'] = table['effect_correlation_sum_input'].abs() + table['effect_correlation_sum_output'].abs()
+        else:
+            logging.info('Using relative values to sum up correlation values!')
+            table['total_effect_correlation_sum'] = table['effect_correlation_sum_input'] + table['effect_correlation_sum_output']
+
+            logging.debug('Generating a bar plot containing the total of the effective correlation changes to %s ...', outDir + 'Total_Correlation_Effect')
+            plotting.plotNodeBars(table.to_dict()['total_effect_correlation_sum'], None, xlabel='Regions', ylabel=None, title='Total Correlation Effect', outPath=outDir + 'Total_Correlation_Effect.png', dpi=dpi)
+
+    logging.debug('Writing neighborhood_correlation_analysis results to %s ...', outDir + 'neighborhood_correlation_analysis.csv')
+    table.to_csv(outDir + 'neighborhood_correlation_analysis.csv')
+
 
 def helper_args_and_cfg():
     try:
@@ -419,50 +427,52 @@ def helper_args_and_cfg():
 ####################################  MAIN #####################################
 
 def main(argv=None):
-    #Get Arguments and config
+    # Get Arguments and config
     args, cfg = helper_args_and_cfg()
 
-    #Helper. Store all output data inside the output directory
+    # Helper. Store all output data inside the output directory
     outDir = args.outputDirectory + os.path.sep
 
-    #Write csv containing the cfos data that will be used for the analysis (containing the HomeCage data)
+    # Write csv containing the cfos data that will be used for the analysis (containing the HomeCage data)
     fos = readCFOS(args.CFOSExpression, args.CFOSExpressionMapping, cfg['cfos_aggregation'],  filterHomeCage=False)
     export_cfos_data(fos, outDir, csv_file='cfosExpression.csv', clustering_figure='Clustering.png', cluster_metric=cfg['cluster_metric'], dpi=cfg['dpi'])
 
-    #Read cfos data without homecage
+    # Read cfos data without homecage
     fos = readCFOS(args.CFOSExpression, args.CFOSExpressionMapping, cfg['cfos_aggregation'], filterHomeCage=True)
     regionsOI = fos.index.levels[0].tolist()
 
-    #Read complete connectome
+    # Read complete connectome
     connectome = readConnectum(args.connectome, args.connectomeMapping, normalizeAxis=None, aggregation_function=cfg['connectome_aggregation'])
 
-    #Generate the structural graph out of the allen brain atlas data, apply normalization, write the subgraph as csv table
+    # Generate the structural graph out of the allen brain atlas data, apply normalization, write the subgraph as csv table
     M = getSubNetwork(connectome, regionsOI, includeNeighbours=False, normalizeAxis=cfg['connectome_normalization'])
     logging.info('Exporting reduced connectome to ReducedConnectom.csv ...')
     M.to_csv(outDir + 'ReducedConnectum.csv')
 
-    #Analyse incoming projection strength of ROIs
+    # Analyse incoming projection strength of ROIs
     anlayseProjectionSource(connectome, regionsOI, outputPath = outDir + 'ProjectionAnalysis.png')
 
-    #Graph representation of the reduced connectome, and plot it, showing projection strength
+    # Graph representation of the reduced connectome, and plot it, showing projection strength
     G = genGraph(M, 0.0)
     pos = plotting.plotGraph(G, title='Regions of Interest', outputDir=outDir, edge_color=None, edge_cmap=plt.cm.Blues, arrows=False)
     plotting.generateCFOSPlots(fos, G, outDir, pos=pos, dpi=cfg['dpi'])
 
-    #Calculate correlation values for each region depending on the cfos activity between the treatment and test state
+    # Calculate correlation values for each region depending on the cfos activity between the treatment and test state
     testCM, treatCM = buildCorrelationMatrix(fos, ['saline', 'saline_EPM', 'saline_shock', 'saline_shock_EPM'], ['DZP', 'DZP_EPM', 'DZP_shock', 'DZP_shock_EPM'], generatePlots=True, dpi=cfg['dpi'], outputDir=outDir)
 
-    #Add correlation values to the network graph (combinig structural and functional data)
+    # Add correlation values to the network graph (combinig structural and functional data)
     testG = tools.updateEdges(G.to_undirected(), testCM, 'weight')
     treatG = tools.updateEdges(G.to_undirected(), treatCM, 'weight')
     plotting.plotCorrelationGraph(testG, title='Correlation under Test', pos=pos, outputPath=outDir + 'TestCorrelationGraph.png', dpi=cfg['dpi'])
     plotting.plotCorrelationGraph(treatG, title='Correlation under Treatment', pos=pos, outputPath=outDir + 'TreatmentCorrelationGraph.png', dpi=cfg['dpi'])
 
-    #Analyse the correlation neighbourhood for each region
-    weight = cfg['weight_edges'].lower() == 'true'
-    average = cfg['average_node'].lower() == 'true'
-    directional = cfg['directional_correlation_analysis'].lower() == 'true'
-    neighbourhood_correlation_analysis(G, testCM, treatCM, pos, directional=directional, weight=weight, average=average, outDir=outDir, dpi=cfg['dpi'])
+    # Analyse the correlation neighbourhood for each region
+    neighbourhood_correlation_analysis(G, testCM, treatCM, pos,
+        directional=cfg['directional_correlation_analysis'],
+        weight=cfg['weight_edges'],
+        average=cfg['average_node'],
+        sum_absolute=cfg['correlation_sum_absolute'],
+        outDir=outDir, dpi=cfg['dpi'])
 
     logging.info('Finished funtional network analysis!')
     sys.exit(0)
@@ -597,6 +607,10 @@ def readConfigFile(fileName, tagName):
         v = parameters[k]
         if v == '':
             v = None
+        elif v.lower() == 'true':
+            v = True
+        elif v.lower() == 'false':
+            v = False
         elif v.isnumeric():
             try:
                 v = float(v)
